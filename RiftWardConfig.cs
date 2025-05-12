@@ -1,0 +1,31 @@
+﻿namespace RiftWardTweaks
+{
+    public class RiftWardConfig
+    {
+        /// <summary>
+        /// The effective radius (in blocks) within which the Rift Ward can block rifts.
+        /// Default: 100
+        /// </summary>
+        public int RiftBlockRange { get; set; } = 100;
+
+        /// <summary>
+        /// Multiplier for fuel consumption rate. Lower values = slower consumption.
+        /// Default: 1.0f
+        /// </summary>
+        public float FuelConsumptionMultiplier { get; set; } = 1.0f;
+
+        /// <summary>
+        /// The radius for scanning Rift Wards around the player.
+        /// Default: 10
+        /// </summary>
+        public int ScanRadius { get; set; } = 10;
+
+        /// <summary>
+        /// The color of the highlighted Rift Ward effective range when scanned.
+        /// Using ARGB hex.
+        /// Default: 33C00FF00
+        /// </summary>
+        public string HighlightColor { get; set; } = "33C00FF00";
+    }
+
+}
