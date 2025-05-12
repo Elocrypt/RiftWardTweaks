@@ -4,13 +4,13 @@
     {
         /// <summary>
         /// The effective radius (in blocks) within which the Rift Ward can block rifts.
-        /// Default: 100
+        /// Default: 30
         /// </summary>
-        public int RiftBlockRange { get; set; } = 100;
+        public int RiftBlockRange { get; set; } = 30;
 
         /// <summary>
         /// Multiplier for fuel consumption rate. Lower values = slower consumption.
-        /// Default: 1.0f
+        /// Default: 1.0f 
         /// </summary>
         public float FuelConsumptionMultiplier { get; set; } = 1.0f;
 
