@@ -1,0 +1,6 @@
+{
+  "riftward:tooltip-chargefor": "Заряду вистачить на {0:0.#} днів",
+  "riftward:tooltip-blockrange": "Радіус блокування: {0} блоків",
+  "riftward:tooltip-highlightcolor": "Колір підсвітки: {0}"
+  "riftward:tooltip-lighthsv": "Колір світла (HSV): {0}"
+}

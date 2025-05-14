@@ -1,0 +1,6 @@
+{
+  "riftward:tooltip-chargefor": "Carga para {0:0.#} dias",
+  "riftward:tooltip-blockrange": "Alcance de bloqueio: {0} blocos",
+  "riftward:tooltip-highlightcolor": "Cor de destaque: {0}"
+  "riftward:tooltip-lighthsv": "Cor da luz HSV: {0}"
+}

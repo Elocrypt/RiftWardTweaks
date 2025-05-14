@@ -1,0 +1,8 @@
+[
+  {
+    "op": "add",
+    "path": "/lightHsv",
+    "value": [0, 0, 0],
+    "file": "blocktypes/machine/riftward.json"
+  }
+]

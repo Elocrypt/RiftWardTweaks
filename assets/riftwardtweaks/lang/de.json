@@ -1,0 +1,6 @@
+{
+  "riftward:tooltip-chargefor": "Ladung reicht für {0:0.#} Tage",
+  "riftward:tooltip-blockrange": "Blockreichweite: {0} Blöcke",
+  "riftward:tooltip-highlightcolor": "Hervorhebungsfarbe: {0}"
+  "riftward:tooltip-lighthsv": "Lichtfarbe (HSV): {0}"
+}

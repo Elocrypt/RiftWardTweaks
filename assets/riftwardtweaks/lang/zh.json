@@ -1,0 +1,6 @@
+{
+  "riftward:tooltip-chargefor": "可用 {0:0.#} 天",
+  "riftward:tooltip-blockrange": "阻挡范围: {0} 格",
+  "riftward:tooltip-highlightcolor": "高亮颜色: {0}"
+  "riftward:tooltip-lighthsv": "光颜色 HSV: {0}"
+}

@@ -25,7 +25,24 @@
         /// Using ARGB hex.
         /// Default: 33C00FF00
         /// </summary>
-        public string HighlightColor { get; set; } = "33C00FF00";
+        public string HighlightColor { get; set; } = "#3C00FF00"; // Transparent green
+
+        /// <summary>
+        /// The duration of the color preview in milliseconds.
+        /// Default: 10000
+        /// </summary>
+        public int ColorPreviewDurationMs { get; set; } = 10000; // 10 seconds
+
+        /// <summary>
+        /// The color of light emitted by Rift Wards, in HSV format.
+        /// Default: { 34, 5, 10 } (calm blue)
+        /// </summary>
+        public int[] LightHSV { get; set; } = new int[] { 34, 5, 15 };
+
+        /// <summary>
+        /// Whether Rift Wards emit light when active.
+        /// </summary>
+        public bool ToggleLight { get; set; } = true;
     }
 
 }

@@ -21,6 +21,10 @@ namespace RiftWardTweaks
         private const string HarmonyServerId = "elo.riftwardtweaks.server";
         private const string HarmonyClientId = "elo.riftwardtweaks.client";
 
+        private readonly List<int> activeColorPreviewIds = new();
+
+        public static List<BlockEntityRiftWard> ActiveWards = new();
+
         private bool rwHighlight = false;
 
         public static class RiftWardKeys
@@ -29,6 +33,9 @@ namespace RiftWardTweaks
             public const string Range = "riftblockrange";
             public const string ScanRadius = "scanradius";
             public const string HighlightColor = "highlightcolor";
+            public const string Duration = "colorpreviewdurationms";
+            public const string LightHSV = "lighthsv";
+            public const string ToggleLight = "togglelight";
         }
 
         #region Entry Points
@@ -39,7 +46,7 @@ namespace RiftWardTweaks
             _capi = capi;
 
             ApplyPatches(HarmonyClientId);
-
+            LoadConfig(capi);
             RegisterClientCommands(capi);
         }
 
@@ -47,7 +54,7 @@ namespace RiftWardTweaks
         {
             base.StartServerSide(sapi);
             _sapi = sapi;
-
+            Harmony.DEBUG = false;
             LoadConfig(sapi);
             ApplyPatches(HarmonyServerId);
 
@@ -64,6 +71,8 @@ namespace RiftWardTweaks
             new Harmony(HarmonyServerId).UnpatchAll(HarmonyServerId);
             new Harmony(HarmonyClientId).UnpatchAll(HarmonyClientId);
             _sapi?.Logger.Notification("[RiftWardTweaks] Harmony patches removed.");
+
+            ActiveWards.Clear();
         }
 
         #endregion
@@ -75,8 +84,16 @@ namespace RiftWardTweaks
             capi.ChatCommands
                 .Create("rwt")
                 .BeginSubCommand("show")
-                .WithDescription("Toggle Rift Ward range visual highlight")
-                .HandleWith(ToggleHighlightCommand)
+                    .WithDescription("Toggle Rift Ward range visual highlight")
+                    .HandleWith(ToggleHighlightCommand)
+                .EndSubCommand()
+                .BeginSubCommand("colors")
+                    .WithDescription("Display preview highlight colors.")
+                    .HandleWith(PreviewHighlightColors)
+                .EndSubCommand()
+                .BeginSubCommand("clear")
+                    .WithDescription("Manually clear the color highlight cubes from .rwt colors.")
+                    .HandleWith(ClearColorPreviewCommand)
                 .EndSubCommand();
         }
 
@@ -84,9 +101,13 @@ namespace RiftWardTweaks
         {
             rwHighlight = !rwHighlight;
 
+            if (_capi?.World == null)
+                return TextCommandResult.Success("[RiftWardTweaks] Client API is not available.");
             var player = _capi?.World.Player as IClientPlayer;
-            if (player == null || _capi == null)
+            if (player?.Entity?.Pos == null)
                 return TextCommandResult.Success("[RiftWardTweaks] Player or client API unavailable.");
+            if (Config == null)
+                return TextCommandResult.Success("[RiftWardTweaks] Configuration not loaded.");
 
             int scanRadius = Config.ScanRadius;
             int wardRange = Config.RiftBlockRange;
@@ -96,7 +117,7 @@ namespace RiftWardTweaks
             {
                 for (int i = 0; i < 100; i++)  // Clear up to 100 highlight slots
                 {
-                    _capi.World.HighlightBlocks(
+                    _capi?.World.HighlightBlocks(
                         player,
                         i,
                         new List<BlockPos>(),
@@ -114,7 +135,7 @@ namespace RiftWardTweaks
             BlockPos minScan = center.AddCopy(-scanRadius, -scanRadius, -scanRadius);
             BlockPos maxScan = center.AddCopy(scanRadius, scanRadius, scanRadius);
 
-            IBlockAccessor accessor = _capi.World.BlockAccessor;
+            IBlockAccessor? accessor = _capi?.World?.BlockAccessor;
 
             int slotId = 0;
             int count = 0;
@@ -124,11 +145,11 @@ namespace RiftWardTweaks
                     for (int z = minScan.Z; z <= maxScan.Z; z++)
                     {
                         BlockPos pos = new(x, y, z);
-                        Block block = accessor.GetBlock(pos);
+                        Block? block = accessor?.GetBlock(pos);
 
                         if (block?.Code?.Path == "riftward")
                         {
-                            BlockEntity be = accessor.GetBlockEntity(pos);
+                            BlockEntity? be = accessor?.GetBlockEntity(pos);
                             if (be is not BlockEntityRiftWard ward || !ward.On) continue;
 
                             BlockPos min = new(pos.X - wardRange, pos.Y - wardRange, pos.Z - wardRange);
@@ -137,7 +158,7 @@ namespace RiftWardTweaks
                             var corners = new List<BlockPos> { min, max };
                             var colors = new List<int> { color, color };
 
-                            _capi.World.HighlightBlocks(
+                            _capi?.World?.HighlightBlocks(
                                 player,
                                 slotId,
                                 corners,
@@ -157,6 +178,98 @@ namespace RiftWardTweaks
 
             return TextCommandResult.Success($"[RiftWardTweaks] Showing {count} Rift Ward highlight range{(count == 1 ? "" : "s")}.");
         }
+        private TextCommandResult PreviewHighlightColors(TextCommandCallingArgs args)
+        {
+            if (_capi?.World?.Player is not IClientPlayer player) return TextCommandResult.Success("Client unavailable.");
+
+            var examples = new Dictionary<int, string>
+            {
+                { ColorUtil.Hex2Int("#3C0000FF"), "Translucent Red (#3C0000FF)" },
+                { ColorUtil.Hex2Int("#3C00FF00"), "Translucent Green (#3C00FF00)" },
+                { ColorUtil.Hex2Int("#3CFF0000"), "Translucent Blue (#3CFF0000)" },
+                { ColorUtil.Hex2Int("#3CFF00FF"), "Translucent Purple (#3CFF00FF)" },
+                { ColorUtil.Hex2Int("#3CFFFFFF"), "Translucent White (#3CFFFFFF)" },
+            };
+            _capi.ShowChatMessage("[RiftWardTweaks] ARGB Color Samples:");
+
+            foreach (var kvp in examples)
+            {
+                _capi.ShowChatMessage($"{kvp.Value.PadRight(24)} {ColorUtil.Int2Hex(kvp.Key)}");
+            }
+            Vec3f look = player.Entity.Pos.GetViewVector();
+            Vec3d forward = new Vec3d(look.X, 0, look.Z).Normalize();
+            Vec3d right = forward.Cross(new Vec3d(0, 1, 0)).Normalize();
+
+            Vec3d basePos = player.Entity.Pos.XYZ.AddCopy(0, 1.5, 0).AddCopy(forward * 4);
+            BlockPos anchor = new((int)basePos.X, (int)basePos.Y, (int)basePos.Z);
+
+            int i = 900;
+            int offset = 0;
+
+            activeColorPreviewIds.Clear();
+            foreach (var pair in examples)
+            {
+                Vec3i rightOffset = right.X > right.Z
+                    ? new Vec3i(Math.Sign(right.X), 0, 0)
+                    : new Vec3i(0, 0, Math.Sign(right.Z));
+
+                BlockPos center = anchor.AddCopy(rightOffset.X * offset, 0, rightOffset.Z * offset);
+                BlockPos min = center.AddCopy(-1, 0, -1);
+                BlockPos max = center.AddCopy(1, 2, 1);
+
+                _capi.World.HighlightBlocks(
+                    player,
+                    i,
+                    new List<BlockPos> { min, max },
+                    new List<int> { pair.Key, pair.Key },
+                    EnumHighlightBlocksMode.Absolute,
+                    EnumHighlightShape.Cube,
+                    1f
+                );
+
+                activeColorPreviewIds.Add(i);
+                int removeId = i;
+                _capi.World.RegisterCallback(_ =>
+                {
+                    _capi.World.HighlightBlocks(
+                        player,
+                        removeId,
+                        new List<BlockPos>(),
+                        new List<int>(),
+                        EnumHighlightBlocksMode.Absolute,
+                        EnumHighlightShape.Cube,
+                        0
+                    );
+                }, Math.Max(100, Config.ColorPreviewDurationMs));
+
+                offset += 3;
+                i++;
+            }
+
+            return TextCommandResult.Success($"[RiftWardTweaks] Showing color samples for {Config.ColorPreviewDurationMs} milliseconds.");
+        }
+
+        private TextCommandResult ClearColorPreviewCommand(TextCommandCallingArgs args)
+        {
+            if (_capi?.World?.Player is not IClientPlayer player)
+                return TextCommandResult.Success("Client unavailable.");
+
+            foreach (var id in activeColorPreviewIds)
+            {
+                _capi.World.HighlightBlocks(
+                    player,
+                    id,
+                    new List<BlockPos>(),
+                    new List<int>(),
+                    EnumHighlightBlocksMode.Absolute,
+                    EnumHighlightShape.Cube,
+                    0
+                );
+            }
+
+            activeColorPreviewIds.Clear();
+            return TextCommandResult.Success("[RiftWardTweaks] Color previews cleared.");
+        }
 
         #endregion
 
@@ -173,7 +286,7 @@ namespace RiftWardTweaks
                     .HandleWith(HandleGetCommand)
                 .EndSubCommand()
                 .BeginSubCommand("set")
-                    .WithDescription("Set a config value.\n" + "Keys:\n" + "- fuel / f / fuelconsumptionmultiplier\n" + "- range / r / riftblockrange\n" + "- scan / s / scanradius\n" + "- color / c / highlightcolor (ARGB hex, e.g. #3C00FF00)\n" + "Example: /rwt set f 0.02")
+                    .WithDescription("Set a config value.\n" + "Keys:\n" + "- fuel / f / fuelconsumptionmultiplier\n" + "- range / r / riftblockrange\n" + "- scan / s / scanradius\n" + "- color / c / highlightcolor (ARGB hex, e.g. #3C00FF00)\n" + "- duration / d / previewdurationms (Milliseconds)\n" + "- light / hsv / lh / l / h / lighthsv (7,7,7)\n" + "- toggle / tl / t / togglelight (true/false)\n" + "Example: /rwt set f 0.02")
                     .WithArgs(
                         sapi.ChatCommands.Parsers.Word("key"),
                         sapi.ChatCommands.Parsers.Word("value")
@@ -280,6 +393,94 @@ namespace RiftWardTweaks
                         Config.HighlightColor = val.ToUpperInvariant();
                         break;
 
+                    case "duration":
+                    case "d":
+                    case RiftWardKeys.Duration:
+                        if (!int.TryParse(val, out int ms) || ms <= 0)
+                        {
+                            msg(player, "Invalid duration. Must be a positive number (in milliseconds).");
+                            return TextCommandResult.Success();
+                        }
+                        Config.ColorPreviewDurationMs = ms;
+                        break;
+
+                    case "light":
+                    case "hsv":
+                    case "lh":
+                    case "l":
+                    case "h":
+                    case RiftWardKeys.LightHSV:
+                        {
+                            string?[]? parts = val?.Split(',');
+                            if (parts?.Length != 3 ||
+                                !int.TryParse(parts[0], out int h) ||
+                                !int.TryParse(parts[1], out int s) ||
+                                !int.TryParse(parts[2], out int v))
+                            {
+                                msg(player, "Invalid HSV format. Use: /rwt set hsv 7,7,7");
+                                return TextCommandResult.Success();
+                            }
+
+                            h = GameMath.Clamp(h, 0, 64);
+                            s = GameMath.Clamp(s, 0, 8);
+                            v = GameMath.Clamp(v, 3, 21);
+
+                            foreach (var be in ModSystemRiftWardTweaks.ActiveWards)
+                            {
+                                if (be is BlockEntityRiftWard ward && ward?.On == true)
+                                {
+                                    byte[] oldHsv = new byte[] {
+                                        (byte)GameMath.Clamp(Config.LightHSV[0], 0, 64),
+                                        (byte)GameMath.Clamp(Config.LightHSV[1], 0, 8),
+                                        (byte)GameMath.Clamp(Config.LightHSV[2], 3, 21)
+                                    };
+                                    _sapi.World.BlockAccessor.RemoveBlockLight(oldHsv, ward.Pos);
+                                }
+                            }
+
+                            Config.LightHSV = new int[] { h, s, v };
+                            _sapi.StoreModConfig(new JsonObject(JToken.FromObject(Config)), ConfigFileName);
+                            msg(player, $"Updated LightHSV to: {h},{s},{v}");
+
+                            foreach (var be in ModSystemRiftWardTweaks.ActiveWards)
+                            {
+                                if (be is BlockEntityRiftWard ward && ward?.On == true)
+                                {
+                                    _sapi.World.BlockAccessor.MarkBlockDirty(ward.Pos);
+                                    _sapi.World.BlockAccessor.MarkBlockModified(ward.Pos);
+                                }
+                            }
+
+                            break;
+                        }
+
+                    case "toggle":
+                    case "tl":
+                    case "t":
+                    case RiftWardKeys.ToggleLight:
+                        {
+                            if (!bool.TryParse(val, out bool toggleLight))
+                            {
+                                msg(player, "Invalid value. Use: true or false");
+                                return TextCommandResult.Success();
+                            }
+
+                            Config.ToggleLight = toggleLight;
+                            _sapi.StoreModConfig(new JsonObject(JToken.FromObject(Config)), ConfigFileName);
+                            msg(player, $"Light emission is now {(toggleLight ? "enabled" : "disabled")}.");
+
+                            foreach (var be in ModSystemRiftWardTweaks.ActiveWards)
+                            {
+                                if (be is BlockEntityRiftWard ward && ward?.On == true)
+                                {
+                                    _sapi.World.BlockAccessor.MarkBlockDirty(ward.Pos);
+                                    _sapi.World.BlockAccessor.MarkBlockModified(ward.Pos);
+                                }
+                            }
+
+                            return TextCommandResult.Success();
+                        }
+
                     default:
                         msg(player, $"Unknown config key: '{key}'");
                         return TextCommandResult.Success();
@@ -325,26 +526,26 @@ namespace RiftWardTweaks
             harmony.PatchAll(Assembly.GetExecutingAssembly());
         }
 
-        private void LoadConfig(ICoreServerAPI sapi)
+        private void LoadConfig(ICoreAPI api)
         {
             try
             {
-                Config = sapi.LoadModConfig<RiftWardConfig>(ConfigFileName);
+                Config = api.LoadModConfig<RiftWardConfig>(ConfigFileName);
 
                 if (Config == null)
                 {
                     Config = new RiftWardConfig();
-                    sapi.StoreModConfig(new JsonObject(JToken.FromObject(Config)), ConfigFileName);
-                    sapi.Logger.Notification("[RiftWardTweaks] Created default config.");
+                    api.StoreModConfig(new JsonObject(JToken.FromObject(Config)), ConfigFileName);
+                    api.Logger.Notification("[RiftWardTweaks] Created default config.");
                 }
                 else
                 {
-                    sapi.Logger.Notification("[RiftWardTweaks] Loaded config from file.");
+                    api.Logger.Notification("[RiftWardTweaks] Loaded config from file.");
                 }
             }
             catch (Exception e)
             {
-                sapi.Logger.Error("[RiftWardTweaks] Failed to load config: " + e);
+                api.Logger.Error("[RiftWardTweaks] Failed to load config: " + e);
                 Config = new RiftWardConfig();
             }
         }
