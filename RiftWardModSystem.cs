@@ -611,9 +611,9 @@ namespace RiftWardTweaks
             player = args.Caller.Player as IServerPlayer;
             if (player == null) return true;
 
-            if (!args.Caller.HasPrivilege("admin"))
+            if (!args.Caller.HasPrivilege("controlserver"))
             {
-                msg(player, "[RiftWardTweaks] You don't have permission to use this command.");
+                msg(player, "You don't have permission to use this command.");
                 return false;
             }
 
