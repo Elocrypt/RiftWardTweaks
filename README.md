@@ -1,6 +1,5 @@
 # Rift Ward Tweaks
 
-
 ## Overview
 
 **Rift Ward Tweaks** is a flexible server/client-side mod that enhances Rift Wards by giving full control over their fuel consumption, blocking range and visual feedback - now with color previews, translations, and advanced customization!
@@ -8,7 +7,13 @@
 ## Features
 
 - **Accurate Fuel Runtime Tooltip**  
-  Tooltip now reflects the actual runtime with your configured multiplier, not just base days.
+  Tooltip reflects effective runtime with your configured multiplier.
+
+- **Client/Server Config Sync**  
+  Server config values (e.g., HSV, FuelMultiplier) are synced to clients on join.
+
+- **Client-Side Customization**  
+  Use `.rwt color`, `.rwt preview`, and `.rwt get` to manage your local highlight preferences.
 
 - **Configurable Rift Blocking Radius**  
   Change how far a Rift Ward suppresses rifts with a simple command or config tweak.
@@ -20,10 +25,10 @@
   Toggle a highlight cube to see each active Rift Ward's protective area with `.rwt show`.
 
 - **Color Preview System**  
-  Preview ARGB highlight colors in-world with `.rwt colors`. Each cube auto-disappears after a configurable duration.
+  Preview ARGB highlight colors in-world with `.rwt preview`.
 
 - **Tooltip Debug Info**  
-  Now includes Blocking Range and ARGB highlight color.
+  Includes Blocking Range, effective runtime, and highlight color.
 
 - **Configurable Scan Radius & Highlight Color**  
   Adjust how far around the player to search for Rift Wards and customize the cube color.
@@ -37,7 +42,7 @@
 - **Multi-language Support**
   Now includes: 🇯🇵 Japanese, 🇨🇳 Chinese, 🇰🇷 Korean, 🇺🇦 Ukrainian, 🇷🇺 Russian, 🇫🇷 French, 🇩🇪 German, 🇪🇸 Spanish, 🇧🇷 Portuguese
 
-- **Config File**: _%AppData%\VintagestoryData\ModConfig\\_ `riftwardtweaksconfig.json`  
+- **Config File**: _%AppData%\VintagestoryData\ModConfig\_ `riftwardtweaksconfig.json`  
   Example:
   ```json
   {
@@ -53,21 +58,22 @@
     ],
     "ToggleLight": true
   }
+  ```
 >**_This config file is automatically generated on first load. 
 You can edit and reload the config dynamically using in-game chat commands—no restart required!_**
 
-
 ## Admin Commands
 
-
 | Command                  | Description                                                        |
-| ------------------------ | ------------------------------------------------------------------ |
-| `/rwt reload`            | Reload the config from disk.                                       |
-| `/rwt get`               | Display the current config values.                                 |
-| `/rwt set <key> <value>` | Change a config setting (see keys below).                          |
-| `.rwt show`              | Toggles the visual highlight of active Rift Ward effective ranges. |
-| `.rwt colors`            | Show ARGB color cube preview in front of you with hex labels in chat. |
-| `.rwt clear`             | Clear any remaining color preview cubes manually.                  |
+|--------------------------|--------------------------------------------------------------------|
+| `/rwt reload`            | Reload the config from disk and sync it to all clients.            |
+| `/rwt get`               | Display current server-side config values.                         |
+| `/rwt set <key> <value>` | Change a config setting live (see keys below).                    |
+| `.rwt show`              | Toggle visual highlight of active Rift Wards.                      |
+| `.rwt color <hex>`       | Set local highlight color in ARGB (e.g., #3C00FF00).               |
+| `.rwt preview`           | Show ARGB color cube preview in front of player.                   |
+| `.rwt clear`             | Clear remaining color preview cubes.                              |
+| `.rwt get`               | Display your local client-side config values.                     |
 
 **Available Keys for `/rwt set`:**
 
@@ -123,7 +129,6 @@ You can edit and reload the config dynamically using in-game chat commands—no 
 ## Notes
 
 * Rift Wards must be **active** to be highlighted and emit light.
-* Rift Wards light can be turned off with `/rwt set t false`
 * Rift Ward lighting is controlled by 'LightHSV' in the config.
 * HSV values are limited by the **[VSLightWheel](http://tyron.at/vs/vslightwheel.html)** — the engine supports a safe range of: 
   - `Hue (H)`: 0-64,
@@ -133,12 +138,13 @@ You can edit and reload the config dynamically using in-game chat commands—no 
 >Going outside this range may result in invisible light, oversaturation, or client crashes. 
 > - HSV values are clamped to `H=0-64`, `S=0–8` and `V=3–21` for stability.
 >   - Changing HSV values while Rift Wards are active will force lighting to update live.
->   - You can safely update light color using `/rwt set hsv` without restarting or breaking the world.
-
+>   - [WARNING] Ghost light may linger briefly when reducing light radius (V). This clears on relog or chunk reload.
+>   - You can safely update light color using `/rwt set hsv` without restarting or breaking the world
 
 * Highlight color must be in full 8-digit ARGB hex (e.g. `#3C00FF00`).
 * Highlight range respects your configured `RiftBlockRange`.
-* Use `.rwt colors` to test highlight apperance in-game.
+* Use `.rwt preview` to test highlight apperance in-game.
+* Full config syncing occurs on join and after any server-side change or reload.
 
 ## Ideas / Planned Features
 
@@ -164,6 +170,6 @@ You can edit and reload the config dynamically using in-game chat commands—no 
 
 ## Support
 
-If you enjoy this mod and want to support future development:
-**[ko-fi.com/elo](https://ko-fi.com/elo)**
-<br /><a href="https://discord.com/users/111920932842450944" target="_blank" rel="noopener"><img src="https://discord.c99.nl/widget/theme-1/111920932842450944.png" alt="" width="395" height="80" /></a>
+If you enjoy this mod and want to support future development:  
+<strong><a href="https://ko-fi.com/elo">ko-fi.com/elo</a></strong><br>
+<a href="https://discord.com/users/111920932842450944" target="_blank"><img src="https://discord.c99.nl/widget/theme-1/111920932842450944.png" alt="Discord Banner" width="395" height="80"></a>

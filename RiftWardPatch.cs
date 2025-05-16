@@ -34,7 +34,7 @@ namespace RiftWardTweaks
             fuelDaysField?.SetValue(__instance, fuelDays);
             lastUpdateField?.SetValue(__instance, totalDays);
 
-            __instance.MarkDirty(false);
+            __instance.MarkDirty(true);
 
             if (fuelDays <= 0)
             {
@@ -75,6 +75,11 @@ namespace RiftWardTweaks
             var type = typeof(BlockEntityRiftWard);
             double fuelDays = (double)(type.GetField("fuelDays", BindingFlags.NonPublic | BindingFlags.Instance)?.GetValue(__instance) ?? 0);
             double multiplier = ModSystemRiftWardTweaks.Config.FuelConsumptionMultiplier;
+            if (multiplier <= 0 || double.IsInfinity(multiplier) || double.IsNaN(multiplier))
+            {
+                multiplier = 1.0;
+                System.Diagnostics.Debug.WriteLine("[RiftWardTweaks] Invalid multiplier detected. Resetting to 1.0");
+            }
             double effectiveRuntime = fuelDays / multiplier;
 
             if (fuelDays > 0 && multiplier != 1.0)
@@ -137,15 +142,14 @@ namespace RiftWardTweaks
         {
             try
             {
-                if (__instance is not BlockRiftWard || !ModSystemRiftWardTweaks.Config.ToggleLight) return true;
-
+                if (__instance is not BlockRiftWard) return true;
                 if (blockAccessor == null || pos == null) return true;
-
+                
                 var be = blockAccessor.GetBlockEntity(pos) as BlockEntityRiftWard;
 
-                if (be?.On == true)
+                if (be?.On == true && ModSystemRiftWardTweaks.Config?.ToggleLight == true)
                 {
-                    int[] raw = ModSystemRiftWardTweaks.Config.LightHSV ?? new int[] { 0, 0, 0 };
+                    int[] raw = ModSystemRiftWardTweaks.Config?.LightHSV ?? new int[] { 0, 0, 0 };
                     int h = GameMath.Clamp(raw[0], 0, 64);
                     int s = GameMath.Clamp(raw[1], 0, 8);
                     int v = GameMath.Clamp(raw[2], 3, 21);
@@ -155,9 +159,9 @@ namespace RiftWardTweaks
 
                 return true;
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[RWT] LightHsv patch failed: {ex}");
+                System.Diagnostics.Debug.WriteLine($"[RiftWardTweaks] LightHsv patch failed: {ex}");
                 return true;
             }
         }
@@ -171,14 +175,7 @@ namespace RiftWardTweaks
             var accessor = __instance?.Api?.World?.BlockAccessor;
             if (accessor == null) return;
 
-            byte[] oldHsv = ModSystemRiftWardTweaks.Config.LightHSV != null
-                ? new byte[] {
-                (byte)GameMath.Clamp(ModSystemRiftWardTweaks.Config.LightHSV[0], 0, 64),
-                (byte)GameMath.Clamp(ModSystemRiftWardTweaks.Config.LightHSV[1], 0, 8),
-                (byte)GameMath.Clamp(ModSystemRiftWardTweaks.Config.LightHSV[2], 3, 21)
-                }
-                : new byte[] { 0, 0, 0 };
-
+            byte[] oldHsv = ModSystemRiftWardTweaks.GetSafeHSV();
             accessor.RemoveBlockLight(oldHsv, __instance?.Pos);
         }
     }
@@ -191,14 +188,7 @@ namespace RiftWardTweaks
             var accessor = __instance?.Api?.World?.BlockAccessor;
             if (accessor == null) return;
 
-            byte[] oldHsv = ModSystemRiftWardTweaks.Config.LightHSV != null
-                ? new byte[] {
-                (byte)GameMath.Clamp(ModSystemRiftWardTweaks.Config.LightHSV[0], 0, 64),
-                (byte)GameMath.Clamp(ModSystemRiftWardTweaks.Config.LightHSV[1], 0, 8),
-                (byte)GameMath.Clamp(ModSystemRiftWardTweaks.Config.LightHSV[2], 3, 21)
-                }
-                : new byte[] { 0, 0, 0 };
-
+            byte[] oldHsv = ModSystemRiftWardTweaks.GetSafeHSV();
             accessor.RemoveBlockLight(oldHsv, __instance?.Pos);
         }
     }
