@@ -1,4 +1,4 @@
-﻿namespace RiftWardTweaks
+﻿namespace RiftWardTweaks.Config
 {
     public class RiftWardConfig
     {

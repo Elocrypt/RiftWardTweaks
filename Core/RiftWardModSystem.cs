@@ -1,6 +1,6 @@
 ﻿using HarmonyLib;
 using Newtonsoft.Json.Linq;
-using System.Net.Sockets;
+using RiftWardTweaks.Config;
 using System.Reflection;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
@@ -9,9 +9,8 @@ using Vintagestory.API.Datastructures;
 using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.GameContent;
-using Vintagestory.Server;
 
-namespace RiftWardTweaks
+namespace RiftWardTweaks.Core
 {
     public class ModSystemRiftWardTweaks : ModSystem
     {
@@ -45,6 +44,13 @@ namespace RiftWardTweaks
 
         #region Entry Points
 
+        public override void Start(ICoreAPI api)
+        {
+            base.Start(api);
+            Harmony.DEBUG = false;
+            api.World.Logger.Event("Rift Ward Tweaks v2.6.0 loading");
+        }
+
         public override void StartClientSide(ICoreClientAPI capi)
         {
             base.StartClientSide(capi);
@@ -63,7 +69,6 @@ namespace RiftWardTweaks
         {
             base.StartServerSide(sapi);
             _sapi = sapi;
-            Harmony.DEBUG = false;
             LoadConfig(sapi);
             ApplyPatches(HarmonyServerId);
             serverChannel = sapi.Network.RegisterChannel("riftwardsync")
@@ -74,7 +79,7 @@ namespace RiftWardTweaks
             );
 
             RegisterServerCommands(sapi);
-            sapi.Event.PlayerJoin += (IServerPlayer player) =>
+            sapi.Event.PlayerJoin += (player) =>
             {
                 serverChannel?.SendPacket(new RiftWardConfigSyncPacket
                 {
@@ -466,14 +471,14 @@ namespace RiftWardTweaks
                                 (byte)oldV
                             };
 
-                            foreach (var be in ModSystemRiftWardTweaks.ActiveWards)
+                            foreach (var be in ActiveWards)
                             {
                                 if (be is BlockEntityRiftWard ward && ward?.On == true)
                                 {
                                     BlockPos center = ward.Pos;
 
                                     int oldRadius = oldV;
-                                    ModSystemRiftWardTweaks.ForceRemoveLight(_sapi, center, oldRadius, oldHsv);
+                                    ForceRemoveLight(_sapi, center, oldRadius, oldHsv);
                                 }
                             }
 
@@ -481,7 +486,7 @@ namespace RiftWardTweaks
                             _sapi.StoreModConfig(new JsonObject(JToken.FromObject(Config)), ConfigFileName);
                             msg(player, $"Updated LightHSV to: {h},{s},{v}");
 
-                            foreach (var be in ModSystemRiftWardTweaks.ActiveWards)
+                            foreach (var be in ActiveWards)
                             {
                                 if (be is BlockEntityRiftWard ward && ward?.On == true)
                                 {
@@ -509,7 +514,7 @@ namespace RiftWardTweaks
                             _sapi.StoreModConfig(new JsonObject(JToken.FromObject(Config)), ConfigFileName);
                             msg(player, $"Light emission is now {(toggleLight ? "enabled" : "disabled")}.");
 
-                            foreach (var be in ModSystemRiftWardTweaks.ActiveWards)
+                            foreach (var be in ActiveWards)
                             {
                                 if (be is BlockEntityRiftWard ward && ward?.On == true)
                                 {
@@ -648,15 +653,15 @@ namespace RiftWardTweaks
             BlockPos max = new(center.X + radius, center.Y + radius, center.Z + radius);
 
             for (int x = min.X; x <= max.X; x++)
-            for (int y = min.Y; y <= max.Y; y++)
-            for (int z = min.Z; z <= max.Z; z++)
-            {
-                BlockPos pos = new(x, y, z);
-                accessor.RemoveBlockLight(oldHsv, pos);
-                Block block = accessor.GetBlock(pos);
-                accessor.SetBlock(block.BlockId, pos);
-                accessor.MarkBlockDirty(pos);
-            }
+                for (int y = min.Y; y <= max.Y; y++)
+                    for (int z = min.Z; z <= max.Z; z++)
+                    {
+                        BlockPos pos = new(x, y, z);
+                        accessor.RemoveBlockLight(oldHsv, pos);
+                        Block block = accessor.GetBlock(pos);
+                        accessor.SetBlock(block.BlockId, pos);
+                        accessor.MarkBlockDirty(pos);
+                    }
         }
 
         public static byte[] GetSafeHSV()

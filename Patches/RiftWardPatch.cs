@@ -1,4 +1,5 @@
 ﻿using HarmonyLib;
+using RiftWardTweaks.Core;
 using System.Reflection;
 using System.Text;
 using Vintagestory.API.Common;
@@ -7,8 +8,10 @@ using Vintagestory.API.MathTools;
 using Vintagestory.API.Server;
 using Vintagestory.GameContent;
 
-namespace RiftWardTweaks
+namespace RiftWardTweaks.Patches
 {
+    #region Fuel & Range
+    
     [HarmonyPatch(typeof(BlockEntityRiftWard), "OnServerTick")]
     public class Patch_RiftWard_FuelReduction
     {
@@ -66,6 +69,10 @@ namespace RiftWardTweaks
             return false;
         }
     }
+
+    #endregion
+
+    #region UI
 
     [HarmonyPatch(typeof(BlockEntityRiftWard), "GetBlockInfo")]
     public class Patch_RiftWard_Tooltip
@@ -129,6 +136,10 @@ namespace RiftWardTweaks
         }
     }
 
+    #endregion
+
+    #region Light
+
     [HarmonyPatch]
     public static class Patch_RiftWard_GetLight
     {
@@ -144,7 +155,7 @@ namespace RiftWardTweaks
             {
                 if (__instance is not BlockRiftWard) return true;
                 if (blockAccessor == null || pos == null) return true;
-                
+
                 var be = blockAccessor.GetBlockEntity(pos) as BlockEntityRiftWard;
 
                 if (be?.On == true && ModSystemRiftWardTweaks.Config?.ToggleLight == true)
@@ -192,4 +203,5 @@ namespace RiftWardTweaks
             accessor.RemoveBlockLight(oldHsv, __instance?.Pos);
         }
     }
+    #endregion
 }
