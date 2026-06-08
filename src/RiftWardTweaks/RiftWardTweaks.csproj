@@ -13,6 +13,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Include="..\..\modinfo.json" Link="modinfo.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Reference Include="0Harmony">
       <HintPath>$(VintageStoryDir)/Lib/0Harmony.dll</HintPath>
 	  <Private>false</Private>
