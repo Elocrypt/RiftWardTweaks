@@ -1,0 +1,12 @@
+{
+  "type": "code",
+  "side": "Universal",
+  "modid": "riftwardtweaks",
+  "name": "Rift Ward Tweaks",
+  "authors": ["Elocrypt"],
+  "description": "Gives you full control over how Rift Wards behave — blocking range, fuel consumption, highlight range, and more..",
+  "version": "2.7.0",
+  "dependencies": {
+    "game": ""
+  }
+}

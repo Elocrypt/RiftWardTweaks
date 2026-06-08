@@ -1,6 +1,6 @@
 {
   "riftward:tooltip-chargefor": "{0:0.#}일 동안 작동",
   "riftward:tooltip-blockrange": "차단 범위: {0} 블록",
-  "riftward:tooltip-highlightcolor": "하이라이트 색상: {0}"
+  "riftward:tooltip-highlightcolor": "하이라이트 색상: {0}",
   "riftward:tooltip-lighthsv": "빛 색상 HSV: {0}"
 }

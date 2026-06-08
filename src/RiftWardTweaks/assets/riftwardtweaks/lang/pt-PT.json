@@ -1,6 +1,6 @@
 {
   "riftward:tooltip-chargefor": "Energia para {0:0.#} dias",
   "riftward:tooltip-blockrange": "Raio de bloqueio: {0} blocos",
-  "riftward:tooltip-highlightcolor": "Cor do destaque: {0}"
+  "riftward:tooltip-highlightcolor": "Cor do destaque: {0}",
   "riftward:tooltip-lighthsv": "Cor da luz HSV: {0}"
 }

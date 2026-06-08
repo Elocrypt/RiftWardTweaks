@@ -1,7 +1,8 @@
-﻿using HarmonyLib;
+using HarmonyLib;
 using Newtonsoft.Json.Linq;
 using RiftWardTweaks.Config;
-using System.Reflection;
+using RiftWardTweaks.Networking;
+using RiftWardTweaks.Patches;
 using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
@@ -14,8 +15,10 @@ namespace RiftWardTweaks.Core
 {
     public class ModSystemRiftWardTweaks : ModSystem
     {
-        public static RiftWardConfig Config { get; private set; } = null!;
-        private ICoreServerAPI? _api;
+        // Internal (not public): RiftWardConfig is internal, so a public property
+        // exposing it would be CS0050. Every consumer is in this assembly.
+        internal static RiftWardConfig Config { get; private set; } = null!;
+
         private ICoreServerAPI? _sapi;
         private ICoreClientAPI? _capi;
         private IServerNetworkChannel? serverChannel;
@@ -27,6 +30,10 @@ namespace RiftWardTweaks.Core
 
         private readonly List<int> activeColorPreviewIds = new();
 
+        // Highlight slot IDs currently in use by /rwt show, tracked so they can be
+        // cleared precisely instead of blindly clearing a hard-coded slot range.
+        private readonly List<int> _activeHighlightSlotIds = new();
+
         public static List<BlockEntityRiftWard> ActiveWards = new();
 
         private bool rwHighlight = false;
@@ -36,8 +43,6 @@ namespace RiftWardTweaks.Core
             public const string Fuel = "fuelconsumptionmultiplier";
             public const string Range = "riftblockrange";
             public const string ScanRadius = "scanradius";
-            public const string HighlightColor = "highlightcolor";
-            public const string Duration = "colorpreviewdurationms";
             public const string LightHSV = "lighthsv";
             public const string ToggleLight = "togglelight";
         }
@@ -56,9 +61,17 @@ namespace RiftWardTweaks.Core
             base.StartClientSide(capi);
             _capi = capi;
 
-            ApplyPatches(HarmonyClientId);
+            ApplyClientPatches(HarmonyClientId);
             RiftWardClientConfig.Load(capi);
-            LoadConfig(capi);
+
+            // The client never reads the server config file. It mirrors the
+            // server-authoritative values from RiftWardConfigSyncPacket (sent on
+            // join and after any /rwt set|reload). Seed a default Config so the
+            // client-side patches don't NPE on Config before the first packet
+            // arrives. In singleplayer the server side has usually populated Config
+            // already, so the null-coalesce leaves it untouched.
+            Config ??= new RiftWardConfig();
+
             clientChannel = capi.Network.RegisterChannel("riftwardsync")
                 .RegisterMessageType<RiftWardConfigSyncPacket>()
                 .SetMessageHandler<RiftWardConfigSyncPacket>(OnReceiveConfigSync);
@@ -70,7 +83,7 @@ namespace RiftWardTweaks.Core
             base.StartServerSide(sapi);
             _sapi = sapi;
             LoadConfig(sapi);
-            ApplyPatches(HarmonyServerId);
+            ApplyServerPatches(HarmonyServerId);
             serverChannel = sapi.Network.RegisterChannel("riftwardsync")
                 .RegisterMessageType<RiftWardConfigSyncPacket>();
             sapi.Logger.Notification(
@@ -79,6 +92,14 @@ namespace RiftWardTweaks.Core
             );
 
             RegisterServerCommands(sapi);
+
+            // Track ward block entities for live light updates (used by /rwt set hsv|toggle).
+            // NOTE: lazy v1 population - this only covers wards placed/broken while the
+            // server is running. Wards already present in loaded chunks are not tracked
+            // until re-placed; those pick up light/HSV changes on chunk reload or relog.
+            sapi.Event.DidPlaceBlock += OnDidPlaceBlock;
+            sapi.Event.DidBreakBlock += OnDidBreakBlock;
+
             sapi.Event.PlayerJoin += (player) =>
             {
                 serverChannel?.SendPacket(new RiftWardConfigSyncPacket
@@ -94,11 +115,40 @@ namespace RiftWardTweaks.Core
 
         public override void Dispose()
         {
+            // UnpatchAll(harmonyId) is the correct Harmony 2.x call; it removes every
+            // patch tagged with that id regardless of how it was applied. The id that
+            // was never used on this side (e.g. the client id on a dedicated server) is
+            // simply a no-op.
             new Harmony(HarmonyServerId).UnpatchAll(HarmonyServerId);
             new Harmony(HarmonyClientId).UnpatchAll(HarmonyClientId);
             _sapi?.Logger.Notification("[RiftWardTweaks] Harmony patches removed.");
 
             ActiveWards.Clear();
+        }
+
+        #endregion
+
+        #region Ward Tracking
+
+        private void OnDidPlaceBlock(IServerPlayer byPlayer, int oldblockId, BlockSelection blockSel, ItemStack withItemStack)
+        {
+            if (_sapi == null || blockSel?.Position == null) return;
+
+            if (_sapi.World.BlockAccessor.GetBlockEntity(blockSel.Position) is BlockEntityRiftWard ward
+                && !ActiveWards.Contains(ward))
+            {
+                ActiveWards.Add(ward);
+            }
+        }
+
+        private void OnDidBreakBlock(IServerPlayer byPlayer, int oldblockId, BlockSelection blockSel)
+        {
+            BlockPos? pos = blockSel?.Position;
+            if (pos == null) return;
+
+            // DidBreakBlock fires after the block is already broken, so the block entity
+            // is gone - match the tracked ward by position instead.
+            ActiveWards.RemoveAll(w => w?.Pos != null && w.Pos.Equals(pos));
         }
 
         #endregion
@@ -119,12 +169,25 @@ namespace RiftWardTweaks.Core
                     .HandleWith(args =>
                     {
                         string hex = args[0]?.ToString() ?? "";
-                        if (!hex.StartsWith("#") || hex.Length != 9)
+                        if (!RiftWardClientConfig.IsValidArgbHex(hex))
                             return TextCommandResult.Success("Invalid format. Use #AARRGGBB.");
 
                         RiftWardClientConfig.HighlightColor = hex.ToUpperInvariant();
                         RiftWardClientConfig.Save();
-                        return TextCommandResult.Success($"Highlight color set to {hex}");
+                        return TextCommandResult.Success($"Highlight color set to {RiftWardClientConfig.HighlightColor}");
+                    })
+                .EndSubCommand()
+                .BeginSubCommand("duration")
+                    .WithDescription("Set how long /rwt preview swatches stay visible (milliseconds)")
+                    .WithArgs(capi.ChatCommands.Parsers.Word("ms"))
+                    .HandleWith(args =>
+                    {
+                        if (!int.TryParse(args[0]?.ToString(), out int ms) || ms <= 0)
+                            return TextCommandResult.Success("Invalid duration. Use a positive number of milliseconds.");
+
+                        RiftWardClientConfig.ColorPreviewDurationMs = ms;
+                        RiftWardClientConfig.Save();
+                        return TextCommandResult.Success($"Preview duration set to {ms} ms.");
                     })
                 .EndSubCommand()
                 .BeginSubCommand("preview")
@@ -139,8 +202,8 @@ namespace RiftWardTweaks.Core
                     .WithDescription("Show local client-side Rift Ward config values")
                     .HandleWith(args =>
                     {
-                        string color = RiftWardClientConfig.HighlightColor ?? "(none)";
-                        int duration = Config?.ColorPreviewDurationMs ?? 0;
+                        string color = RiftWardClientConfig.HighlightColor;
+                        int duration = RiftWardClientConfig.ColorPreviewDurationMs;
 
                         _capi?.ShowChatMessage("[RiftWardTweaks] Local Client Config:");
                         _capi?.ShowChatMessage($"- HighlightColor: {color}");
@@ -163,27 +226,17 @@ namespace RiftWardTweaks.Core
             if (Config == null)
                 return TextCommandResult.Success("[RiftWardTweaks] Configuration not loaded.");
 
-            int scanRadius = Config.ScanRadius;
-            int wardRange = Config.RiftBlockRange;
-            int color = ParseHexColor(RiftWardClientConfig.HighlightColor);
+            // Always clear whatever we highlighted last, by tracked slot id.
+            ClearHighlightSlots(player);
 
             if (!rwHighlight)
             {
-                for (int i = 0; i < 100; i++)  // Clear up to 100 highlight slots
-                {
-                    _capi?.World.HighlightBlocks(
-                        player,
-                        i,
-                        new List<BlockPos>(),
-                        new List<int>(),
-                        EnumHighlightBlocksMode.Absolute,
-                        EnumHighlightShape.Cube,
-                        1f
-                    );
-                }
-
                 return TextCommandResult.Success("[RiftWardTweaks] Rift Ward highlights disabled.");
             }
+
+            int scanRadius = Config.ScanRadius;
+            int wardRange = Config.RiftBlockRange;
+            int color = ParseHexColor(RiftWardClientConfig.HighlightColor);
 
             BlockPos center = player.Entity.Pos.AsBlockPos;
             BlockPos minScan = center.AddCopy(-scanRadius, -scanRadius, -scanRadius);
@@ -222,6 +275,7 @@ namespace RiftWardTweaks.Core
                                 1f
                             );
 
+                            _activeHighlightSlotIds.Add(slotId);
                             slotId++;
                             count++;
                         }
@@ -232,6 +286,29 @@ namespace RiftWardTweaks.Core
 
             return TextCommandResult.Success($"[RiftWardTweaks] Showing {count} Rift Ward highlight range{(count == 1 ? "" : "s")}.");
         }
+
+        /// <summary>
+        /// Clears every block-highlight slot that /rwt show is currently using and
+        /// empties the tracking list. Replaces the old "clear slots 0-99" loop.
+        /// </summary>
+        private void ClearHighlightSlots(IClientPlayer player)
+        {
+            foreach (int id in _activeHighlightSlotIds)
+            {
+                _capi?.World.HighlightBlocks(
+                    player,
+                    id,
+                    new List<BlockPos>(),
+                    new List<int>(),
+                    EnumHighlightBlocksMode.Absolute,
+                    EnumHighlightShape.Cube,
+                    1f
+                );
+            }
+
+            _activeHighlightSlotIds.Clear();
+        }
+
         private TextCommandResult PreviewHighlightColors(TextCommandCallingArgs args)
         {
             if (_capi?.World?.Player is not IClientPlayer player) return TextCommandResult.Success("Client unavailable.");
@@ -294,13 +371,13 @@ namespace RiftWardTweaks.Core
                         EnumHighlightShape.Cube,
                         0
                     );
-                }, Math.Max(100, Config.ColorPreviewDurationMs));
+                }, Math.Max(100, RiftWardClientConfig.ColorPreviewDurationMs));
 
                 offset += 3;
                 i++;
             }
 
-            return TextCommandResult.Success($"[RiftWardTweaks] Showing color samples for {Config.ColorPreviewDurationMs} milliseconds.");
+            return TextCommandResult.Success($"[RiftWardTweaks] Showing color samples for {RiftWardClientConfig.ColorPreviewDurationMs} milliseconds.");
         }
 
         private TextCommandResult ClearColorPreviewCommand(TextCommandCallingArgs args)
@@ -340,7 +417,7 @@ namespace RiftWardTweaks.Core
                     .HandleWith(HandleGetCommand)
                 .EndSubCommand()
                 .BeginSubCommand("set")
-                    .WithDescription("Set a config value.\n" + "Keys:\n" + "- fuel / f / fuelconsumptionmultiplier\n" + "- range / r / riftblockrange\n" + "- scan / s / scanradius\n" + "- duration / d / previewdurationms (Milliseconds)\n" + "- light / hsv / lh / l / h / lighthsv (7,7,7)\n" + "- toggle / tl / t / togglelight (true/false)\n" + "Example: /rwt set f 0.02")
+                    .WithDescription("Set a config value.\n" + "Keys:\n" + "- fuel / f / fuelconsumptionmultiplier\n" + "- range / r / riftblockrange\n" + "- scan / s / scanradius\n" + "- light / hsv / lh / l / h / lighthsv (7,7,7)\n" + "- toggle / tl / t / togglelight (true/false)\n" + "Example: /rwt set f 0.02")
                     .WithArgs(
                         sapi.ChatCommands.Parsers.Word("key"),
                         sapi.ChatCommands.Parsers.Word("value")
@@ -429,17 +506,6 @@ namespace RiftWardTweaks.Core
                             return TextCommandResult.Success();
                         }
                         Config.ScanRadius = radius;
-                        break;
-
-                    case "duration":
-                    case "d":
-                    case RiftWardKeys.Duration:
-                        if (!int.TryParse(val, out int ms) || ms <= 0)
-                        {
-                            msg(player, "Invalid duration. Must be a positive number (in milliseconds).");
-                            return TextCommandResult.Success();
-                        }
-                        Config.ColorPreviewDurationMs = ms;
                         break;
 
                     case "light":
@@ -575,10 +641,22 @@ namespace RiftWardTweaks.Core
 
         #region Utility
 
-        private void ApplyPatches(string harmonyId)
+        private void ApplyServerPatches(string harmonyId)
+        {
+            // Patch individually (not PatchAll) so server-only patches never get applied
+            // on a pure client. In singleplayer both sides run, each under its own id.
+            var harmony = new Harmony(harmonyId);
+            harmony.CreateClassProcessor(typeof(Patch_RiftWard_FuelReduction)).Patch();
+            harmony.CreateClassProcessor(typeof(Patch_RiftWard_RangeIncrease)).Patch();
+            harmony.CreateClassProcessor(typeof(Patch_RiftWard_Deactivate_LightRemove)).Patch();
+            harmony.CreateClassProcessor(typeof(Patch_RiftWard_Remove_LightRemove)).Patch();
+        }
+
+        private void ApplyClientPatches(string harmonyId)
         {
             var harmony = new Harmony(harmonyId);
-            harmony.PatchAll(Assembly.GetExecutingAssembly());
+            harmony.CreateClassProcessor(typeof(Patch_RiftWard_GetLight)).Patch();
+            harmony.CreateClassProcessor(typeof(Patch_RiftWard_Tooltip)).Patch();
         }
 
         private void LoadConfig(ICoreAPI api)
@@ -587,12 +665,8 @@ namespace RiftWardTweaks.Core
             {
                 Config = api.LoadModConfig<RiftWardConfig>(ConfigFileName);
 
-                if (Config.FuelConsumptionMultiplier <= 0)
-                {
-                    api.Logger.Warning("[RWT] Invalid FuelConsumptionMultiplier in config, using default of 1.0");
-                    Config.FuelConsumptionMultiplier = 1.0f;
-                }
-
+                // Null check FIRST: LoadModConfig returns null (does not throw) when the
+                // file is missing, so any property access before this would NPE.
                 if (Config == null)
                 {
                     Config = new RiftWardConfig();
@@ -603,6 +677,12 @@ namespace RiftWardTweaks.Core
                 {
                     api.Logger.Notification("[RiftWardTweaks] Loaded config from file.");
                 }
+
+                // Repair any invalid values centrally on a guaranteed non-null Config.
+                if (Config.Normalize())
+                {
+                    api.Logger.Warning("[RiftWardTweaks] Config contained invalid values; reset to safe defaults.");
+                }
             }
             catch (Exception e)
             {
@@ -611,10 +691,15 @@ namespace RiftWardTweaks.Core
             }
         }
 
+        /// <summary>
+        /// Console callers (player == null) are intentionally treated as authorized:
+        /// the dedicated-server console has no player privileges to check and is already
+        /// trusted. Player callers must hold the controlserver privilege.
+        /// </summary>
         private bool IsAuthorized(TextCommandCallingArgs args, out IServerPlayer? player)
         {
             player = args.Caller.Player as IServerPlayer;
-            if (player == null) return true;
+            if (player == null) return true; // Server console: trusted, no privilege to check.
 
             if (!args.Caller.HasPrivilege("controlserver"))
             {
@@ -685,6 +770,10 @@ namespace RiftWardTweaks.Core
                 ScanRadius = packet.ScanRadius
             };
 
+            // Defence-in-depth: the server already normalises before sending, but this
+            // also guarantees LightHSV is length-3 for GetSafeHSV / the GetLight patch.
+            Config.Normalize();
+
             _capi?.Logger.Notification("[RiftWardTweaks] Synced config from server.");
         }
 
@@ -699,9 +788,15 @@ namespace RiftWardTweaks.Core
                 ScanRadius = Config.ScanRadius
             };
 
-            foreach (IServerPlayer sp in _sapi?.World?.AllOnlinePlayers.OfType<IServerPlayer>() ?? Enumerable.Empty<IServerPlayer>())
+            var players = _sapi?.World?.AllOnlinePlayers;
+            if (players == null) return;
+
+            foreach (IPlayer p in players)
             {
-                serverChannel?.SendPacket(packet, sp);
+                if (p is IServerPlayer sp)
+                {
+                    serverChannel?.SendPacket(packet, sp);
+                }
             }
         }
 

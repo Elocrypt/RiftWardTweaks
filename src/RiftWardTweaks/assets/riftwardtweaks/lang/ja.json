@@ -1,6 +1,6 @@
 {
   "riftward:tooltip-chargefor": "{0:0.#} 日間稼働可能",
   "riftward:tooltip-blockrange": "ブロック範囲: {0} ブロック",
-  "riftward:tooltip-highlightcolor": "ハイライトカラー: {0}"
+  "riftward:tooltip-highlightcolor": "ハイライトカラー: {0}",
   "riftward:tooltip-lighthsv": "ライトカラー (HSV): {0}"
 }

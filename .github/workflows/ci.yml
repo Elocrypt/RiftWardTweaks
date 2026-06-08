@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      # The Vintage Story server build is a free, publicly distributed tarball that contains the
+      # same API assemblies as the paid client. We extract it once per CI run and point the build
+      # at the extracted directory via VINTAGE_STORY so reference resolution works without
+      # committing any game DLLs to the repo.
+      #
+      # NOTE: Verify the URL at https://www.vintagestory.at/download/ before a release — the CDN
+      # path changes occasionally between versions.
+      - name: Download Vintage Story server assemblies
+        run: |
+          set -e
+          mkdir -p "$HOME/vs"
+          curl -fL -o vs.tar.gz "https://cdn.vintagestory.at/gamefiles/stable/vs_server_linux-x64_1.22.3.tar.gz"
+          tar -xzf vs.tar.gz -C "$HOME/vs"
+          echo "VINTAGE_STORY=$HOME/vs" >> "$GITHUB_ENV"
+
+      - name: Restore
+        run: dotnet restore RiftWardTweaks.sln
+
+      - name: Build
+        run: dotnet build RiftWardTweaks.sln --configuration Release --no-restore /p:DeployMod=false
+
+      - name: Test
+        run: dotnet test RiftWardTweaks.sln --configuration Release --no-build --verbosity normal
