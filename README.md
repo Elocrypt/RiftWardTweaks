@@ -1,175 +1,250 @@
+<div align="center">
+
 # Rift Ward Tweaks
 
-## Overview
+**Take full control of Vintage Story's Rift Wards — fuel burn, blocking range, light emission, and an in-world range visualiser, all tunable live without a restart.**
 
-**Rift Ward Tweaks** is a flexible server/client-side mod that enhances Rift Wards by giving full control over their fuel consumption, blocking range and visual feedback - now with color previews, translations, and advanced customization!
+Blocking range · fuel multiplier · HSV light · range highlight · colour previews · server-authoritative config with client sync.
+
+[![CI](https://github.com/Elocrypt/RiftWardTweaks/actions/workflows/ci.yml/badge.svg)](https://github.com/Elocrypt/RiftWardTweaks/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Elocrypt/RiftWardTweaks?include_prereleases)](https://github.com/Elocrypt/RiftWardTweaks/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![VS 1.22.3](https://img.shields.io/badge/Vintage%20Story-1.22.3-purple)](https://www.vintagestory.at/)
+
+</div>
+
+---
+
+> **Updated for Vintage Story 1.22.3 on .NET 10.** Highlight colour and preview duration are now per-player client settings — set them with `.rwt color` and `.rwt duration` — and have been removed from the server config and `/rwt set`. Existing server configs still load; the old keys are simply ignored.
 
 ## Features
 
-- **Accurate Fuel Runtime Tooltip**  
-  Tooltip reflects effective runtime with your configured multiplier.
+<table>
+<tr>
+<td width="50%" valign="top">
 
-- **Client/Server Config Sync**  
-  Server config values (e.g., HSV, FuelMultiplier) are synced to clients on join.
+### Gameplay
+- **Configurable blocking radius** — change how far an active ward suppresses rifts, live or via config
+- **Fuel consumption multiplier** — slow the burn for relaxed play, or speed it up for a challenge
+- **Configurable HSV light emission** — active wards cast a light you choose, kept inside the engine-safe [VSLightWheel](http://tyron.at/vs/vslightwheel.html) range and updatable live with `/rwt set hsv`
 
-- **Client-Side Customization**  
-  Use `.rwt color`, `.rwt preview`, and `.rwt get` to manage your local highlight preferences.
+### Visuals
+- **In-world range highlight** — toggle a cube around every nearby active ward with `.rwt show`
+- **ARGB colour preview** — spawn sample swatches in front of you with `.rwt preview` to pick a highlight colour
+- **Accurate fuel-runtime tooltip** — the ward tooltip reflects your real runtime under the configured multiplier, now localised in every supported language
 
-- **Configurable Rift Blocking Radius**  
-  Change how far a Rift Ward suppresses rifts with a simple command or config tweak.
+</td>
+<td width="50%" valign="top">
 
-- **Fuel Consumption Multiplier**  
-  Control how quickly temporal gear energy is drained.
+### Config & sync
+- **Server-authoritative config** — gameplay values live on the server and sync to each client on join and after any change
+- **Per-player local settings** — your highlight colour and preview duration are stored client-side and never forced by the server
 
-- **Visual Highlight of Effective Range**  
-  Toggle a highlight cube to see each active Rift Ward's protective area with `.rwt show`.
+### Commands & control
+- **Live `/rwt` admin commands** (`get` / `set` / `reload`) and per-player `.rwt` client commands — no restart required
+- **Targeted Harmony patches** — coexists quietly with most other mods
 
-- **Color Preview System**  
-  Preview ARGB highlight colors in-world with `.rwt preview`.
+### Languages
+- Ships in **10 languages** (see below)
 
-- **Tooltip Debug Info**  
-  Includes Blocking Range, effective runtime, and highlight color.
+</td>
+</tr>
+</table>
 
-- **Configurable Scan Radius & Highlight Color**  
-  Adjust how far around the player to search for Rift Wards and customize the cube color.
+## Install
 
-- **Configurable Light Emission (HSV)**
-  Toggle Rift Ward light emission dynamically when active. Customize the light’s hue, saturation, and brightness with safe values based on the official [VSLightWheel](http://tyron.at/vs/vslightwheel.html). Supports runtime updates with `/rwt set hsv`.
+1. Download the latest `RiftWardTweaks_<version>.zip` from the [Releases](https://github.com/Elocrypt/RiftWardTweaks/releases) page or the [Vintage Story mod portal](https://mods.vintagestory.at/riftwardtweaks).
+2. Drop the zip (don't extract it) into your Vintage Story `Mods/` folder:
+   - **Windows:** `%AppData%\VintagestoryData\Mods`
+   - **Linux:** `~/.config/VintagestoryData/Mods`
+   - **macOS:** `~/Library/Application Support/VintagestoryData/Mods`
+3. Launch the game. The config file is generated automatically on first load.
 
-- **Live Runtime Commands**
-  Adjust, reload, or visualize without restarting the game or server.
+Works in singleplayer and on multiplayer servers. **For multiplayer, install it on the server** — it changes server-side gameplay (fuel, range, light) and syncs the values to each client on join.
 
-- **Multi-language Support**
-  Now includes: 🇯🇵 Japanese, 🇨🇳 Chinese, 🇰🇷 Korean, 🇺🇦 Ukrainian, 🇷🇺 Russian, 🇫🇷 French, 🇩🇪 German, 🇪🇸 Spanish, 🇧🇷 Portuguese
+## Commands
 
-- **Config File**: _%AppData%\VintagestoryData\ModConfig\_ `riftwardtweaksconfig.json`  
-  Example:
-  ```json
-  {
-    "RiftBlockRange": 30,
-    "FuelConsumptionMultiplier": 0.05,
-    "ScanRadius": 10,
-    "HighlightColor": "#3C00FF00",
-    "ColorPreviewDurationMs": 10000,
-    "LightHSV": [ 
-      34, 
-      5, 
-      15
-    ],
-    "ToggleLight": true
-  }
-  ```
->**_This config file is automatically generated on first load. 
-You can edit and reload the config dynamically using in-game chat commands—no restart required!_**
+Server commands use `/rwt` and require the `controlserver` privilege. Client commands use `.rwt` and affect only your own game.
 
-## Admin Commands
+### Server (`/rwt`)
 
-| Command                  | Description                                                        |
-|--------------------------|--------------------------------------------------------------------|
-| `/rwt reload`            | Reload the config from disk and sync it to all clients.            |
-| `/rwt get`               | Display current server-side config values.                         |
-| `/rwt set <key> <value>` | Change a config setting live (see keys below).                    |
-| `.rwt show`              | Toggle visual highlight of active Rift Wards.                      |
-| `.rwt color <hex>`       | Set local highlight color in ARGB (e.g., #3C00FF00).               |
-| `.rwt preview`           | Show ARGB color cube preview in front of player.                   |
-| `.rwt clear`             | Clear remaining color preview cubes.                              |
-| `.rwt get`               | Display your local client-side config values.                     |
+| Command | Description |
+|---|---|
+| `/rwt get` | Show the current server-side config values. |
+| `/rwt set <key> <value>` | Change a value live, save it, and sync to all clients. |
+| `/rwt reload` | Reload the config from disk and sync to all clients. |
 
-**Available Keys for `/rwt set`:**
+### Client (`.rwt`)
+
+| Command | Description |
+|---|---|
+| `.rwt show` | Toggle the range highlight for nearby active wards. |
+| `.rwt color <hex>` | Set your local highlight colour, e.g. `#3C00FF00`. |
+| `.rwt duration <ms>` | Set how long `.rwt preview` swatches stay on screen. |
+| `.rwt preview` | Show ARGB colour sample swatches in front of you. |
+| `.rwt clear` | Clear any remaining preview swatches. |
+| `.rwt get` | Show your local client settings. |
+
+### Keys for `/rwt set`
 
 * `fuel`, `f`, `fuelconsumptionmultiplier`
 * `range`, `r`, `riftblockrange`
 * `scan`, `s`, `scanradius`
-* `color`, `c`, `highlightcolor` (ARGB format, e.g. `#3C00FF00`)
-* `duration`, `d`, `colorpreviewdurationms` (in milliseconds)
-* `light`, `hsv`, `lh`, `l`, `h`, `lighthsv` (HSV format using VSLightWheel)
-* `toggle`, `tl`, `t`, `togglelight` (true/false)
+* `light`, `hsv`, `lh`, `l`, `h`, `lighthsv` — value format `H,S,V`
+* `toggle`, `tl`, `t`, `togglelight` — `true` / `false`
 
-**Examples**:
+> Highlight colour and preview duration are per-player client settings — set them with `.rwt color` and `.rwt duration`, not `/rwt set`.
+
+### Examples
 
 ```bash
 /rwt set f 0.02
 /rwt set r 120
 /rwt set scan 80
-/rwt set color #3CFF0000
-/rwt set duration 5000
 /rwt set hsv 7,7,7
 /rwt set tl false
 ```
 
-**Color Chart**
+## Configuration
 
-| What You Want          | Use This ARGB Code |
-| ---------------------- | ------------------ |
-| `🔴 Translucent Red`  |	#3C0000FF         |
-| `🟢 Translucent Green`|	#3C00FF00         |
-| `🔵 Translucent Blue` |	#3CFF0000         |
-| `⚪ Translucent White`|	#3CFFFFFF          |
-| `⚫ Invisible`        |	#0000000            |
-| `💜 Translucent Purple` |	#3CFF00FF       |
-```# Alpha - Blue - Green - Red```
+Both files live in your `VintagestoryData/ModConfig/` folder and are generated automatically on first load.
 
-## Ideal For
+**Server** — `riftwardtweaksconfig.json`
 
-* Hardcore worlds with heavy rift activity
-* Long-form or passive playthroughs where fuel micromanagement is tedious
-* Builders or tech players who want visual clarity on area effects
+```json
+{
+  "RiftBlockRange": 30,
+  "FuelConsumptionMultiplier": 0.05,
+  "ScanRadius": 10,
+  "LightHSV": [ 34, 5, 15 ],
+  "ToggleLight": true
+}
+```
+
+**Client** — `riftwardtweaks_client.json`
+
+```json
+{
+  "HighlightColor": "#3C00FF00",
+  "ColorPreviewDurationMs": 10000
+}
+```
+
+Edit the server file and run `/rwt reload`, or just use `/rwt set` — no restart required. Your client settings are written automatically by `.rwt color` and `.rwt duration`.
+
+## Light &amp; HSV
+
+Light colour is set by `LightHSV` and constrained to the engine-safe [VSLightWheel](http://tyron.at/vs/vslightwheel.html) range:
+
+- `Hue (H)`: 0–64 (wraps at 64, same as 0)
+- `Saturation (S)`: 0–8 (use 0–7; 8 wraps back to white)
+- `Value / brightness (V)`: 3–21 (also controls light radius)
+
+> Values are clamped for stability — going outside these ranges can produce invisible light, oversaturation, or client crashes. Changing HSV while wards are active updates their light live; faint ghost light may linger briefly when you lower V and clears on relog or chunk reload. You can recolour safely with `/rwt set hsv` without restarting or breaking the world.
+
+A few starting points for `/rwt set hsv`: red `0,7,15` · green `21,7,15` · cyan `32,7,15` · blue `43,7,15` · violet `50,7,15` · the default calm blue `34,5,15` · white `0,0,15`.
+
+### Highlight colour chart (`.rwt color`)
+
+| Colour | ARGB code |
+|---|---|
+| 🔴 Translucent red | `#3C0000FF` |
+| 🟢 Translucent green | `#3C00FF00` |
+| 🔵 Translucent blue | `#3CFF0000` |
+| ⚪ Translucent white | `#3CFFFFFF` |
+| 💜 Translucent purple | `#3CFF00FF` |
+| ⚫ Invisible | `#00000000` |
+
+`#AABBGGRR` — Alpha, Blue, Green, Red.
 
 ## Compatibility
 
-* Works in both **singleplayer** and **multiplayer/server**.
-* Compatible with most other mods. Uses targeted Harmony patches.
+- Works in both **singleplayer** and **multiplayer/server**.
+- Uses targeted Harmony patches and coexists with most other mods.
+- **Currently incompatible with [More Lanterns](https://mods.vintagestory.at/apelanterns)** — it breaks the Rift Ward light feature. Everything else still works if you don't mind losing the light.
 
-## Installation
+## Languages
 
-1. Drop the `.zip` into your `Mods/` folder.
-2. Launch the game. The config file will be auto-generated.
-3. Use `/rwt set`, `/rwt reload`, or edit the config file directly.
+English, German, French, Spanish, Portuguese (Brazil &amp; Portugal), Russian, Ukrainian, Chinese, Japanese, and Korean. The game picks the right language automatically based on your client locale, and the fuel-runtime tooltip is localised in all of them. Contributions welcome.
 
-## Notes
+---
 
-* Rift Wards must be **active** to be highlighted and emit light.
-* Rift Ward lighting is controlled by 'LightHSV' in the config.
-* HSV values are limited by the **[VSLightWheel](http://tyron.at/vs/vslightwheel.html)** — the engine supports a safe range of: 
-  - `Hue (H)`: 0-64,
-  - `Saturation (S)`: 0-8
-  - `Value (V)`: 3-21
+<details>
+<summary><b>Building from source</b></summary>
 
->Going outside this range may result in invisible light, oversaturation, or client crashes. 
-> - HSV values are clamped to `H=0-64`, `S=0–8` and `V=3–21` for stability.
->   - Changing HSV values while Rift Wards are active will force lighting to update live.
->   - [WARNING] Ghost light may linger briefly when reducing light radius (V). This clears on relog or chunk reload.
->   - You can safely update light color using `/rwt set hsv` without restarting or breaking the world
+### Requirements
 
-* Highlight color must be in full 8-digit ARGB hex (e.g. `#3C00FF00`).
-* Highlight range respects your configured `RiftBlockRange`.
-* Use `.rwt preview` to test highlight apperance in-game.
-* Full config syncing occurs on join and after any server-side change or reload.
+- Vintage Story 1.22.3 or later (for the referenced game DLLs)
+- .NET 10 SDK
 
-## Ideas / Planned Features
+### Setup
 
-### Not Guarenteed
+The project references the game assemblies by `HintPath` into your install (no NuGet game packages), resolved from environment variables:
 
->- Add configurable light to Rift Wards, so they can emit light. ✅
+- `VINTAGE_STORY` — the game install directory (contains `VintagestoryAPI.dll`, `Vintagestory.exe`).
+- `VINTAGE_STORY_DATA` — the data directory (contains `Mods/`, `ModConfig/`, `Saves/`).
 
->- Add configurable shape to the Rift Ward range highlighter (e.g. Dome).
+```powershell
+# Windows (PowerShell)
+[Environment]::SetEnvironmentVariable("VINTAGE_STORY",      "F:\VintageStory\Client_v1.22.3\Vintagestory",   "User")
+[Environment]::SetEnvironmentVariable("VINTAGE_STORY_DATA", "F:\VintageStory\Client_v1.22.3\Vintagestory\v", "User")
+```
 
->- Add a UI icon or some way to display to the player they are within range of an active Rift Ward.
+`Directory.Build.props` falls back to a default Windows install path if the variables aren't set, so a standard developer machine may need no configuration. Restart your IDE after setting the variables so it picks them up.
 
->- Add togglable statistics to the UI, including: Amount of fuel a ward has consumed (gears), Total time active (in-game days).
+### Build
 
->- Add a notification when a Rift Ward becomes inactive (ran out of fuel).
+```powershell
+dotnet build RiftWardTweaks.sln -c Release
+```
 
->- Add a debug mode and seperate logic for regular use and debugging.
+The game DLLs are referenced with `<Private>false</Private>`, so they are **not** copied into `bin/` — only the mod's own `RiftWardTweaks.dll` and assets are produced.
 
->- Add a configurable option to have the total charge (effective duration) dynamically change the effective blocking range of rifts.\
-  _*Note: Would need to seperate blocking range per rift ward._
+### Test
 
->- Add a GUI that can be opened via configurable Hotkey, where you can adjust everything in the config. \
-  _*Note: Add color picker._
+```powershell
+dotnet test RiftWardTweaks.sln -c Release
+```
+
+### Package a release
+
+```powershell
+./build/package.ps1 -Configuration Release -Version <version>
+```
+
+Produces `build/dist/RiftWardTweaks_<version>.zip`, ready to upload to the mod portal. On push of a tag matching `v*.*.*`, GitHub Actions builds, tests, packages, and publishes a release automatically — see `.github/workflows/release.yml`. CI downloads the matching Vintage Story server build for its reference assemblies, so no game DLLs are committed to the repo.
+
+### Project layout
+
+- **`Config/`** — `RiftWardConfig` (server-authoritative data class) and `RiftWardClientConfig` (client-local highlight colour + preview duration).
+- **`Core/`** — `ModSystemRiftWardTweaks`, the entry point for both sides; loads config, registers commands, applies side-gated Harmony patches, and runs the sync channel.
+- **`Networking/`** — `RiftWardConfigSyncPacket`, the ProtoBuf DTO that carries server config values to clients.
+- **`Patches/`** — all Harmony patches: fuel consumption, rift-block range, the tooltip rewrite, light emission, and light cleanup on deactivate/remove.
+
+</details>
+
+## Roadmap
+
+Planned, not guaranteed:
+
+- Configurable highlight shape (e.g. dome).
+- An in-range indicator so players know when they're standing inside an active ward's field.
+- Ward statistics (fuel consumed, time active) and a low-fuel / deactivation notification.
+- Per-player config overrides for multiplayer fairness.
+- A config GUI with a colour picker, openable via a configurable hotkey.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
+## Credits
+
+Created and maintained by [Elocrypt](https://mods.vintagestory.at/show/user/341F988399701B22FFDA). Thanks to everyone who has contributed translations.
 
 ## Support
 
-If you enjoy this mod and want to support future development:  
-<strong><a href="https://ko-fi.com/elo">ko-fi.com/elo</a></strong><br>
-<a href="https://discord.com/users/111920932842450944" target="_blank"><img src="https://discord.c99.nl/widget/theme-1/111920932842450944.png" alt="Discord Banner" width="395" height="80"></a>
+If you enjoy this mod and want to support future development:
+
+**[Ko-fi](https://ko-fi.com/elo)** · **[Patreon](https://www.patreon.com/c/Elocrypt)** · **[Throne](https://throne.com/elocrypt)**
+
+<a href="https://discord.com/users/111920932842450944" target="_blank"><img src="https://discord.c99.nl/widget/theme-1/111920932842450944.png" alt="Discord" width="395" height="80"></a>
