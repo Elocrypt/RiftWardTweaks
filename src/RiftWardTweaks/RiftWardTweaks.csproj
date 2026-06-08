@@ -11,6 +11,12 @@
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
   </PropertyGroup>
+  
+  <ItemGroup>
+  <None Include="..\..\modinfo.json"
+        Link="modinfo.json"
+        CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 
   <ItemGroup>
     <Reference Include="0Harmony">
