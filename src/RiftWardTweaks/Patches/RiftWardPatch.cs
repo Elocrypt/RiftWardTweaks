@@ -3,6 +3,7 @@ using RiftWardTweaks.Config;
 using RiftWardTweaks.Core;
 using System.Reflection;
 using System.Text;
+using Vintagestory.API.Client;
 using Vintagestory.API.Common;
 using Vintagestory.API.Config;
 using Vintagestory.API.MathTools;
@@ -215,5 +216,89 @@ namespace RiftWardTweaks.Patches
             accessor.RemoveBlockLight(oldHsv, __instance?.Pos);
         }
     }
+    #endregion
+
+    #region Sound
+
+    // Vanilla BlockEntityRiftWard plays a looping ambient hum through the public
+    // ToggleAmbientSound(bool): client-side only, loads "sounds/block/riftward.ogg",
+    // fades to 0.5 volume, Range 6, started from Activate() and on chunk load. We
+    // replace it so each player's client-local settings (mute / volume / range)
+    // decide whether and how loudly it plays. Signature verified against VS 1.22.x
+    // (vssurvivalmod BlockEntity/BERiftWard.cs).
+    [HarmonyPatch(typeof(BlockEntityRiftWard), "ToggleAmbientSound")]
+    internal static class Patch_RiftWard_Sound
+    {
+        // The hum the ward owns lives in a protected field; reflected once at type load.
+        private static readonly FieldInfo? AmbientSoundField =
+            typeof(BlockEntityRiftWard).GetField("ambientSound", BindingFlags.NonPublic | BindingFlags.Instance);
+
+        // Ensures the "could not reflect" warning is logged at most once per session.
+        private static bool _warnedMissingField;
+
+        // Replaces ToggleAmbientSound on the client (returns false). Defers to vanilla
+        // (returns true) on the server and if the field can't be reflected, so the worst
+        // case is unchanged stock audio rather than a missing sound or a crash.
+        static bool Prefix(BlockEntityRiftWard __instance, bool on)
+        {
+            if (__instance.Api?.Side != EnumAppSide.Client) return true;
+
+            if (AmbientSoundField == null)
+            {
+                if (!_warnedMissingField)
+                {
+                    _warnedMissingField = true;
+                    __instance.Api.Logger.Warning(
+                        "[RiftWardTweaks] Could not reflect ambientSound on BlockEntityRiftWard; " +
+                        "leaving the vanilla ward hum unchanged. The rift ward internals may have changed.");
+                }
+                return true;
+            }
+
+            var capi = (ICoreClientAPI)__instance.Api;
+            var sound = AmbientSoundField.GetValue(__instance) as ILoadedSound;
+
+            // Turning off, muted, or volume 0: fade out anything playing and never (re)start.
+            if (!on || !RiftWardClientConfig.SoundEnabled || RiftWardClientConfig.SoundVolumePercent <= 0)
+            {
+                sound?.FadeOut(0.5f, s => s.Dispose());
+                AmbientSoundField.SetValue(__instance, null);
+                return false;
+            }
+
+            float volume = RiftWardClientConfig.ResolvedSoundVolume;
+
+            // Already playing: glide to the configured volume. Range is fixed at load time,
+            // so a range change is applied by the command re-toggling the sound off then on.
+            if (sound != null && sound.IsPlaying)
+            {
+                sound.FadeTo(volume, 1f, _ => { });
+                return false;
+            }
+
+            // (Re)create the looping hum at the player's chosen volume and range.
+            sound = capi.World.LoadSound(new SoundParams
+            {
+                Location = new AssetLocation("sounds/block/riftward.ogg"),
+                ShouldLoop = true,
+                Position = __instance.Pos.ToVec3f().Add(0.5f, 0.5f, 0.5f),
+                DisposeOnFinish = false,
+                Volume = 0f,
+                Range = RiftWardClientConfig.SoundRange,
+                SoundType = EnumSoundType.Ambient
+            });
+
+            if (sound != null)
+            {
+                sound.Start();
+                sound.FadeTo(volume, 1f, _ => { });
+                sound.PlaybackPosition = sound.SoundLengthSeconds * (float)capi.World.Rand.NextDouble();
+            }
+
+            AmbientSoundField.SetValue(__instance, sound);
+            return false;
+        }
+    }
+
     #endregion
 }

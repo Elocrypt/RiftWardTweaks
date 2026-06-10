@@ -198,6 +198,55 @@ namespace RiftWardTweaks.Core
                     .WithDescription("Manually clear the color highlight cubes from .rwt colors.")
                     .HandleWith(ClearColorPreviewCommand)
                 .EndSubCommand()
+                .BeginSubCommand("sound")
+                    .WithDescription("Toggle the Rift Ward ambient hum on this client (on/off)")
+                    .WithArgs(capi.ChatCommands.Parsers.Word("state"))
+                    .HandleWith(args =>
+                    {
+                        string state = (args[0]?.ToString() ?? "").ToLowerInvariant();
+                        bool on;
+                        switch (state)
+                        {
+                            case "on": case "true": case "1": case "enable": case "enabled": on = true; break;
+                            case "off": case "false": case "0": case "disable": case "disabled": on = false; break;
+                            default: return TextCommandResult.Success("Invalid value. Use: on or off.");
+                        }
+
+                        RiftWardClientConfig.SoundEnabled = on;
+                        RiftWardClientConfig.Save();
+                        ReapplyWardSound();
+                        return TextCommandResult.Success($"Rift Ward sound {(on ? "enabled" : "disabled")}.");
+                    })
+                .EndSubCommand()
+                .BeginSubCommand("volume")
+                    .WithDescription("Set Rift Ward sound volume on this client (0-100%)")
+                    .WithArgs(capi.ChatCommands.Parsers.Word("percent"))
+                    .HandleWith(args =>
+                    {
+                        if (!int.TryParse(args[0]?.ToString(), out int pct) || !RiftWardClientConfig.IsValidVolumePercent(pct))
+                            return TextCommandResult.Success("Invalid volume. Use a whole number from 0 to 100.");
+
+                        RiftWardClientConfig.SoundVolumePercent = pct;
+                        RiftWardClientConfig.Save();
+                        ReapplyWardSound();
+                        return TextCommandResult.Success($"Rift Ward sound volume set to {pct}%.");
+                    })
+                .EndSubCommand()
+                .BeginSubCommand("soundrange")
+                    .WithDescription("Set how far the Rift Ward hum carries on this client (blocks)")
+                    .WithArgs(capi.ChatCommands.Parsers.Word("blocks"))
+                    .HandleWith(args =>
+                    {
+                        if (!int.TryParse(args[0]?.ToString(), out int range) || !RiftWardClientConfig.IsValidSoundRange(range))
+                            return TextCommandResult.Success(
+                                $"Invalid range. Use a whole number from {RiftWardClientConfig.MinSoundRange} to {RiftWardClientConfig.MaxSoundRange} blocks.");
+
+                        RiftWardClientConfig.SoundRange = range;
+                        RiftWardClientConfig.Save();
+                        ReapplyWardSound();
+                        return TextCommandResult.Success($"Rift Ward sound range set to {range} blocks.");
+                    })
+                .EndSubCommand()
                 .BeginSubCommand("get")
                     .WithDescription("Show local client-side Rift Ward config values")
                     .HandleWith(args =>
@@ -208,10 +257,45 @@ namespace RiftWardTweaks.Core
                         _capi?.ShowChatMessage("[RiftWardTweaks] Local Client Config:");
                         _capi?.ShowChatMessage($"- HighlightColor: {color}");
                         _capi?.ShowChatMessage($"- PreviewDurationMs: {duration} ms");
+                        _capi?.ShowChatMessage($"- Sound: {(RiftWardClientConfig.SoundEnabled ? "on" : "off")}");
+                        _capi?.ShowChatMessage($"- SoundVolume: {RiftWardClientConfig.SoundVolumePercent}%");
+                        _capi?.ShowChatMessage($"- SoundRange: {RiftWardClientConfig.SoundRange} blocks");
 
                         return TextCommandResult.Success();
                     })
                 .EndSubCommand();
+        }
+
+        /// <summary>
+        /// Re-applies the local sound settings to every nearby Rift Ward by toggling
+        /// each ward's ambient hum off and back on, so a volume or range change takes
+        /// effect immediately instead of waiting for a chunk reload. Range in particular
+        /// is baked in when the sound is created, so the off-then-on cycle is required to
+        /// rebuild it; the patch mutes rather than restarting when sound is disabled.
+        /// Bounded by the synced scan radius and only touches already-loaded wards.
+        /// </summary>
+        private void ReapplyWardSound()
+        {
+            if (_capi?.World?.Player is not IClientPlayer player || player.Entity?.Pos == null) return;
+            IBlockAccessor? accessor = _capi.World.BlockAccessor;
+            if (accessor == null) return;
+
+            int scanRadius = Config?.ScanRadius ?? 10;
+            BlockPos center = player.Entity.Pos.AsBlockPos;
+            BlockPos min = center.AddCopy(-scanRadius, -scanRadius, -scanRadius);
+            BlockPos max = center.AddCopy(scanRadius, scanRadius, scanRadius);
+
+            for (int x = min.X; x <= max.X; x++)
+                for (int y = min.Y; y <= max.Y; y++)
+                    for (int z = min.Z; z <= max.Z; z++)
+                    {
+                        BlockPos pos = new(x, y, z);
+                        if (accessor.GetBlock(pos)?.Code?.Path != "riftward") continue;
+                        if (accessor.GetBlockEntity(pos) is not BlockEntityRiftWard ward) continue;
+
+                        ward.ToggleAmbientSound(false);
+                        if (ward.On) ward.ToggleAmbientSound(true);
+                    }
         }
 
         private TextCommandResult ToggleHighlightCommand(TextCommandCallingArgs args)
@@ -657,6 +741,7 @@ namespace RiftWardTweaks.Core
             var harmony = new Harmony(harmonyId);
             harmony.CreateClassProcessor(typeof(Patch_RiftWard_GetLight)).Patch();
             harmony.CreateClassProcessor(typeof(Patch_RiftWard_Tooltip)).Patch();
+            harmony.CreateClassProcessor(typeof(Patch_RiftWard_Sound)).Patch();
         }
 
         private void LoadConfig(ICoreAPI api)

@@ -4,7 +4,7 @@
 
 **Take full control of Vintage Story's Rift Wards — fuel burn, blocking range, light emission, and an in-world range visualiser, all tunable live without a restart.**
 
-Blocking range · fuel multiplier · HSV light · range highlight · colour previews · server-authoritative config with client sync.
+Blocking range · fuel multiplier · HSV light · range highlight · colour previews · adjustable ward sound · server-authoritative config with client sync.
 
 [![CI](https://github.com/Elocrypt/RiftWardTweaks/actions/workflows/ci.yml/badge.svg)](https://github.com/Elocrypt/RiftWardTweaks/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Elocrypt/RiftWardTweaks?include_prereleases)](https://github.com/Elocrypt/RiftWardTweaks/releases)
@@ -38,7 +38,7 @@ Blocking range · fuel multiplier · HSV light · range highlight · colour prev
 
 ### Config & sync
 - **Server-authoritative config** — gameplay values live on the server and sync to each client on join and after any change
-- **Per-player local settings** — your highlight colour and preview duration are stored client-side and never forced by the server
+- **Per-player local settings** — your highlight colour, preview duration, and ward-sound settings (mute / volume / range) are stored client-side and never forced by the server
 
 ### Commands & control
 - **Live `/rwt` admin commands** (`get` / `set` / `reload`) and per-player `.rwt` client commands — no restart required
@@ -83,6 +83,9 @@ Server commands use `/rwt` and require the `controlserver` privilege. Client com
 | `.rwt duration <ms>` | Set how long `.rwt preview` swatches stay on screen. |
 | `.rwt preview` | Show ARGB colour sample swatches in front of you. |
 | `.rwt clear` | Clear any remaining preview swatches. |
+| `.rwt sound <on/off>` | Mute or unmute the Rift Ward ambient hum for yourself. |
+| `.rwt volume <0-100>` | Set the ward hum volume (100% = vanilla; 0 = silent). |
+| `.rwt soundrange <blocks>` | Set how far the hum carries (1–64); lower it to keep wards quiet near your base. |
 | `.rwt get` | Show your local client settings. |
 
 ### Keys for `/rwt set`
@@ -126,11 +129,14 @@ Both files live in your `VintagestoryData/ModConfig/` folder and are generated a
 ```json
 {
   "HighlightColor": "#3C00FF00",
-  "ColorPreviewDurationMs": 10000
+  "ColorPreviewDurationMs": 10000,
+  "SoundEnabled": true,
+  "SoundVolumePercent": 100,
+  "SoundRange": 6
 }
 ```
 
-Edit the server file and run `/rwt reload`, or just use `/rwt set` — no restart required. Your client settings are written automatically by `.rwt color` and `.rwt duration`.
+Edit the server file and run `/rwt reload`, or just use `/rwt set` — no restart required. Your client settings are written automatically by `.rwt color`, `.rwt duration`, and the sound commands (`.rwt sound`, `.rwt volume`, `.rwt soundrange`).
 
 ## Light &amp; HSV
 

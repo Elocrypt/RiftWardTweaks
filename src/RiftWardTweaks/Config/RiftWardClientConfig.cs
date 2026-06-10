@@ -32,6 +32,43 @@ namespace RiftWardTweaks.Config
         /// <summary>How long <c>/rwt preview</c> swatches remain visible, in milliseconds.</summary>
         public static int ColorPreviewDurationMs = DefaultColorPreviewDurationMs;
 
+        /// <summary>Default state of the Rift Ward ambient hum on this client.</summary>
+        public const bool DefaultSoundEnabled = true;
+
+        /// <summary>Default ambient-sound volume, as a percentage of the vanilla level.</summary>
+        public const int DefaultSoundVolumePercent = 100;
+
+        /// <summary>Default ambient-sound audible range, in blocks (the vanilla value).</summary>
+        public const int DefaultSoundRange = 6;
+
+        /// <summary>Lowest accepted <see cref="SoundRange"/>, in blocks.</summary>
+        public const int MinSoundRange = 1;
+
+        /// <summary>Highest accepted <see cref="SoundRange"/>, in blocks.</summary>
+        public const int MaxSoundRange = 64;
+
+        /// <summary>
+        /// Absolute volume (0–1) the vanilla ward fades its hum to. 100% maps to this,
+        /// so the mod never plays the sound louder than stock.
+        /// </summary>
+        private const float SoundVolumeCeiling = 0.5f;
+
+        /// <summary>Whether the Rift Ward ambient hum plays at all on this client.</summary>
+        public static bool SoundEnabled = DefaultSoundEnabled;
+
+        /// <summary>Ambient-sound volume as a percentage (0–100) of the vanilla level.</summary>
+        public static int SoundVolumePercent = DefaultSoundVolumePercent;
+
+        /// <summary>Ambient-sound audible range, in blocks.</summary>
+        public static int SoundRange = DefaultSoundRange;
+
+        /// <summary>
+        /// The configured volume resolved to the absolute 0–1 value the engine uses,
+        /// i.e. the chosen percentage of the vanilla ceiling. Read by the sound patch.
+        /// </summary>
+        public static float ResolvedSoundVolume =>
+            Math.Clamp(SoundVolumePercent, 0, 100) / 100f * SoundVolumeCeiling;
+
         // Captured during Load so Save() can report write failures without having
         // to change its (caller-facing) parameterless signature.
         private static ILogger? _logger;
@@ -78,6 +115,39 @@ namespace RiftWardTweaks.Config
                         loadedDuration, DefaultColorPreviewDurationMs);
                     ColorPreviewDurationMs = DefaultColorPreviewDurationMs;
                 }
+
+                // Sound — toggle (bool), volume as a 0–100 percentage, range in blocks.
+                bool? loadedSoundEnabled = data.Value<bool?>("SoundEnabled");
+                if (loadedSoundEnabled.HasValue)
+                {
+                    SoundEnabled = loadedSoundEnabled.Value;
+                }
+
+                int? loadedVolume = data.Value<int?>("SoundVolumePercent");
+                if (IsValidVolumePercent(loadedVolume))
+                {
+                    SoundVolumePercent = loadedVolume!.Value;
+                }
+                else if (loadedVolume is not null)
+                {
+                    capi.Logger.Warning(
+                        "[RiftWardTweaks] Ignoring invalid SoundVolumePercent '{0}' in client config; must be 0–100. Falling back to {1}.",
+                        loadedVolume, DefaultSoundVolumePercent);
+                    SoundVolumePercent = DefaultSoundVolumePercent;
+                }
+
+                int? loadedRange = data.Value<int?>("SoundRange");
+                if (IsValidSoundRange(loadedRange))
+                {
+                    SoundRange = loadedRange!.Value;
+                }
+                else if (loadedRange is not null)
+                {
+                    capi.Logger.Warning(
+                        "[RiftWardTweaks] Ignoring invalid SoundRange '{0}' in client config; must be {1}–{2}. Falling back to {3}.",
+                        loadedRange, MinSoundRange, MaxSoundRange, DefaultSoundRange);
+                    SoundRange = DefaultSoundRange;
+                }
             }
             catch (Exception e)
             {
@@ -97,7 +167,10 @@ namespace RiftWardTweaks.Config
                 JObject obj = new()
                 {
                     ["HighlightColor"] = HighlightColor,
-                    ["ColorPreviewDurationMs"] = ColorPreviewDurationMs
+                    ["ColorPreviewDurationMs"] = ColorPreviewDurationMs,
+                    ["SoundEnabled"] = SoundEnabled,
+                    ["SoundVolumePercent"] = SoundVolumePercent,
+                    ["SoundRange"] = SoundRange
                 };
                 File.WriteAllText(path, obj.ToString());
             }
@@ -122,5 +195,14 @@ namespace RiftWardTweaks.Config
             }
             return true;
         }
+
+        /// <summary>True when <paramref name="value"/> is a volume percentage in the 0–100 range.</summary>
+        internal static bool IsValidVolumePercent(int? value) => value is >= 0 and <= 100;
+
+        /// <summary>
+        /// True when <paramref name="value"/> is a sound range within the accepted block bounds
+        /// (<see cref="MinSoundRange"/>–<see cref="MaxSoundRange"/>).
+        /// </summary>
+        internal static bool IsValidSoundRange(int? value) => value is >= MinSoundRange and <= MaxSoundRange;
     }
 }
