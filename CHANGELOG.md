@@ -4,6 +4,15 @@ All notable changes to this project are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.8.0] - 2026/06/07
+
+Per-player control over the Rift Ward ambient sound.
+
+### Added
+
+- Per-player Rift Ward sound controls: `.rwt sound <on|off>` to mute the ambient hum, `.rwt volume <0-100>` to set its volume, and `.rwt soundrange <blocks>` to change how far it carries. All three are client-local, saved to `riftwardtweaks_client.json`, and applied to nearby wards immediately.
+- `.rwt get` now also lists the sound settings (on/off, volume, range) alongside the highlight colour and preview duration.
+
 ## [2.7.0] - 2026/06/07
 
 Update for Vintage Story 1.22.3 on .NET 10, with a structural cleanup of the config, commands, and Harmony patches.
@@ -11,10 +20,8 @@ Update for Vintage Story 1.22.3 on .NET 10, with a structural cleanup of the con
 ### Added
 
 - Client-side `.rwt duration <ms>` command to set how long `.rwt preview` colour swatches stay visible.
-- Per-player Rift Ward sound controls: `.rwt sound <on|off>` to mute the ambient hum, `.rwt volume <0-100>` to set its volume, and `.rwt soundrange <blocks>` to change how far it carries. All three are client-local, saved to `riftwardtweaks_client.json`, and applied to nearby wards immediately.
 - Active wards are now tracked as they are placed and broken, so `/rwt set hsv` and `/rwt set toggle` update the light on already-placed wards within the session. Wards in chunks that were loaded before the change pick it up on chunk reload or relog.
 - `ColorPreviewDurationMs` is now persisted in the client config (`riftwardtweaks_client.json`) and validated on load.
-- `.rwt get` now also lists the sound settings (on/off, volume, range) alongside the highlight colour and preview duration.
 - Config self-repair: malformed values (non-positive fuel multiplier, wrong-length `LightHSV`, non-positive range/scan) are corrected to safe defaults on load.
 
 ### Changed
@@ -39,5 +46,6 @@ Update for Vintage Story 1.22.3 on .NET 10, with a structural cleanup of the con
 - Server `/rwt set` keys `color` / `c` / `highlightcolor` and `duration` / `d` / `colorpreviewdurationms` — these settings are per-player and now live client-side (`.rwt color`, `.rwt duration`).
 - `HighlightColor` and `ColorPreviewDurationMs` fields from the server config (`RiftWardConfig`).
 
-[Unreleased]: https://github.com/Elocrypt/RiftWardTweaks/compare/v2.7.0...HEAD
+[Unreleased]: https://github.com/Elocrypt/RiftWardTweaks/compare/v2.8.0...HEAD
+[2.8.0]: https://github.com/Elocrypt/RiftWardTweaks/compare/v2.7.0...v2.8.0
 [2.7.0]: https://github.com/Elocrypt/RiftWardTweaks/compare/v2.6.0...v2.7.0
